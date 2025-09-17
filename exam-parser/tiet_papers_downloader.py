@@ -85,16 +85,63 @@ def wait_for_results(driver, query_text: str, timeout=12):
     Wait for either the results header OR at least one data row.
     Also tries to wait for a row containing the query (for code searches).
     """
+    print(f"Waiting for results with query: '{query_text}'")
+    
     banner = (By.XPATH, "//*[contains(., 'These results matches your search criteria')]")
     table_row = (By.XPATH, "//table//tr[td]")
     code_row = (By.XPATH, f"//table//tr[td and normalize-space(td[1])='{query_text}']")
+    
+    # Also wait for any loading indicators to disappear
+    loading_indicators = [
+        "//div[contains(@class, 'loading')]",
+        "//div[contains(@id, 'loading')]",
+        "//*[contains(text(), 'Loading')]",
+        "//*[contains(text(), 'Please wait')]"
+    ]
+    
     try:
-        WebDriverWait(driver, timeout).until(
-            lambda d: d.find_elements(*banner) or d.find_elements(*code_row) or len(d.find_elements(*table_row)) > 1
+        # First wait for loading indicators to disappear
+        for indicator in loading_indicators:
+            try:
+                WebDriverWait(driver, 5).until_not(
+                    EC.presence_of_element_located((By.XPATH, indicator))
+                )
+            except:
+                pass  # Loading indicator might not exist, that's fine
+        
+        # Then wait for actual results
+        result = WebDriverWait(driver, timeout).until(
+            lambda d: (
+                d.find_elements(*banner) or 
+                d.find_elements(*code_row) or 
+                len(d.find_elements(*table_row)) > 1
+            )
         )
-    except Exception:
+        
+        # Debug: print what we found
+        if driver.find_elements(*banner):
+            print("Found results banner")
+        if driver.find_elements(*code_row):
+            print(f"Found specific course code row for: {query_text}")
+        if len(driver.find_elements(*table_row)) > 1:
+            print(f"Found {len(driver.find_elements(*table_row))} table rows")
+            
+        return True
+        
+    except Exception as e:
+        print(f"Timeout waiting for results: {e}")
+        # Debug: print current page state
+        try:
+            page_source = driver.page_source
+            if "no results" in page_source.lower() or "no data" in page_source.lower():
+                print("Page indicates no results found")
+            elif "error" in page_source.lower():
+                print("Page shows an error")
+            else:
+                print("Page loaded but no clear results indicator found")
+        except:
+            pass
         return False
-    return True
 
 # ...existing code...
 
@@ -103,21 +150,31 @@ def wait_present(driver, by, selector, timeout=30):
     return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, selector)))
 
 def fill_and_submit(input_el, text: str):
+    print(f"Filling input with: '{text}'")
+    
     # Make sure focus is on the input and we overwrite anything present
     input_el.click()
+    time.sleep(0.5)  # Small delay to ensure focus
+    
     input_el.send_keys(Keys.CONTROL, "a")
     input_el.send_keys(Keys.DELETE)
+    time.sleep(0.2)  # Small delay after clearing
+    
     input_el.send_keys(text)
+    time.sleep(0.5)  # Small delay after typing
 
     # Try Enter first (many forms wire Enter to submit)
     try:
+        print("Trying to submit with Enter key...")
         input_el.send_keys(Keys.ENTER)
+        time.sleep(1)  # Wait a moment for form submission
         return
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Enter key submission failed: {e}")
 
     # Otherwise click the nearest form's submit control (input/button)
     try:
+        print("Looking for submit button in form...")
         form = input_el.find_element(By.XPATH, "ancestor::form[1]")
         submit = form.find_element(
             By.XPATH,
@@ -126,14 +183,22 @@ def fill_and_submit(input_el, text: str):
         )
         WebDriverWait(input_el.parent, 10).until(EC.element_to_be_clickable(submit))
         submit.click()
-    except Exception:
+        time.sleep(1)  # Wait for form submission
+    except Exception as e:
+        print(f"Form submit button failed: {e}")
         # Last resort: first submit/button on page
-        btn = WebDriverWait(input_el.parent, 10).until(EC.element_to_be_clickable((
-            By.XPATH,
-            "(//input[@type='submit' or contains(translate(@value,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'submit')]"
-            "|//button[@type='submit' or contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'submit')])[1]"
-        )))
-        btn.click()
+        try:
+            print("Looking for any submit button on page...")
+            btn = WebDriverWait(input_el.parent, 10).until(EC.element_to_be_clickable((
+                By.XPATH,
+                "(//input[@type='submit' or contains(translate(@value,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'submit')]"
+                "|//button[@type='submit' or contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'submit')])[1]"
+            )))
+            btn.click()
+            time.sleep(1)  # Wait for form submission
+        except Exception as e2:
+            print(f"All submit methods failed: {e2}")
+            raise RuntimeError("Could not submit the search form")
 
 
 def normalize_filename(t: str) -> str:
@@ -141,22 +206,39 @@ def normalize_filename(t: str) -> str:
     return re.sub(r"\s+", "_", t) or "file"
 
 def collect_results_rows(driver):
+    print("Collecting results from page...")
     tables = driver.find_elements(By.XPATH, "//table")
+    print(f"Found {len(tables)} tables on page")
+    
     rows_out = []
-    for tbl in tables:
+    for i, tbl in enumerate(tables):
         rows = tbl.find_elements(By.XPATH, ".//tr")
+        print(f"Table {i+1}: {len(rows)} rows")
+        
         if len(rows) < 2:
             continue
-        for r in rows[1:]:  # skip first row (header)
+            
+        for j, r in enumerate(rows[1:], 1):  # skip first row (header)
             tds = r.find_elements(By.XPATH, ".//td")
             if len(tds) >= 5:
                 # extra guard: ignore header-like rows
                 first = (tds[0].text or "").strip().lower()
                 if first in {"course code", "course code", "course_code"}:
+                    print(f"Skipping header row: {first}")
                     continue
+                
+                # Debug: print the course code we found
+                course_code = tds[0].text.strip()
+                print(f"Found course: {course_code}")
                 rows_out.append(r)
+            else:
+                print(f"Row {j} has only {len(tds)} columns, skipping")
+                
         if rows_out:
+            print(f"Using table {i+1} with {len(rows_out)} valid rows")
             break
+    
+    print(f"Total valid rows collected: {len(rows_out)}")
     return rows_out
 
 
@@ -356,6 +438,13 @@ def main():
         if not name_input:
             raise RuntimeError("Couldn't locate the Course Name input.")
         fill_and_submit(name_input, query)
+
+    # Wait for search results to load
+    print(f"Waiting for search results for: {query}")
+    if not wait_for_results(driver, query, timeout=20):
+        print("Search results did not load within timeout period.")
+        driver.quit()
+        return
 
     rows = collect_results_rows(driver)
     if not rows:
