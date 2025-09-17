@@ -3,32 +3,42 @@
 import Image from "next/image"
 import { useState } from "react";
 import { runPythonScript } from "./api";
+import { LoadingButton } from "@/components/loading-button";
+import { WordPullUp } from "@/components/ui/word-pull-up";
 
 export default function App(){
   const [option, setOption] = useState("1");
   const [value, setValue] = useState("");
   const [mergePdfs, setMergePdfs] = useState(false);
   const [examFilter, setExamFilter] = useState("all");
-  const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setOutput("");
+    setSuccess(false);
+    setError("");
+    
     try {
       const res = await runPythonScript(option, value, mergePdfs, examFilter);
       if (res.output && res.output.includes("SUCCESS:")) {
-        setOutput("✅ Papers downloaded to your Downloads/ThaparPapers folder");
+        setSuccess(true);
+        setLoading(false);
+        // Reset success after 3 seconds
+        setTimeout(() => setSuccess(false), 3000);
       } else if (res.output && res.output.includes("No results found")) {
-        setOutput("❌ No papers found for the given search criteria");
+        setError("❌ No papers found for the given search criteria");
+        setLoading(false);
       } else {
-        setOutput(res.error || "An error occurred");
+        setError(res.error || "An error occurred");
+        setLoading(false);
       }
     } catch (error) {
-      setOutput("❌ An error occurred while processing your request");
+      setError("❌ An error occurred while processing your request");
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return <div className="app-container">
@@ -71,9 +81,28 @@ export default function App(){
         </label>
       </div>
       
-      <button type="submit">Submit</button>
+      <LoadingButton 
+        type="submit" 
+        loading={loading}
+        className="w-full"
+      >
+        {loading ? "Parsing..." : "Submit"}
+      </LoadingButton>
     </form>
-    {loading && <div className="mt-4">Processing, Please wait...</div>}
-    {output && <div className="mt-4"><pre>{output}</pre></div>}
+    
+    {success && (
+      <div className="mt-6 flex justify-center">
+        <WordPullUp 
+          words="Successfully Downloaded" 
+          className="text-green-600 text-2xl"
+        />
+      </div>
+    )}
+    
+    {error && (
+      <div className="mt-4 text-center text-red-600">
+        {error}
+      </div>
+    )}
   </div>
 }
