@@ -6,6 +6,11 @@ import { runPythonScript } from "./api";
 import { LoadingButton } from "@/components/loading-button";
 import { WordPullUp } from "@/components/ui/word-pull-up";
 
+function normalizeCourseCode(courseCode: string): string {
+  if (!courseCode) return "";
+  return courseCode.replace(/[- ]/g, '').toUpperCase();
+}
+
 export default function App(){
   const [option, setOption] = useState("1");
   const [value, setValue] = useState("");

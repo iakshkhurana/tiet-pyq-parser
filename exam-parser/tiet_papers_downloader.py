@@ -25,12 +25,32 @@ def make_driver(download_dir: pathlib.Path, headless: bool = True) -> webdriver.
     opts = Options()
     if headless:
         opts.add_argument("--headless=new")
+    
+    # GPU and rendering fixes
     opts.add_argument("--disable-gpu")
+    opts.add_argument("--disable-gpu-sandbox")
+    opts.add_argument("--disable-software-rasterizer")
+    opts.add_argument("--disable-background-timer-throttling")
+    opts.add_argument("--disable-backgrounding-occluded-windows")
+    opts.add_argument("--disable-renderer-backgrounding")
+    opts.add_argument("--disable-features=TranslateUI")
+    opts.add_argument("--disable-ipc-flooding-protection")
+    
+    # Memory and stability fixes
     opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-extensions")
+    opts.add_argument("--disable-plugins")
+    opts.add_argument("--disable-images")
     opts.add_argument("--window-size=1400,1000")
-    opts.add_argument('--log-level=3')  # Suppress most Chrome logs
+    
+    # Logging suppression
+    opts.add_argument('--log-level=3')
     opts.add_argument('--disable-logging')
-    opts.add_argument('--disable-dev-shm-usage')
+    opts.add_argument('--silent')
+    opts.add_argument('--disable-web-security')
+    opts.add_argument('--disable-features=VizDisplayCompositor')
+    
     opts.add_experimental_option("excludeSwitches", ["enable-logging"])
     opts.add_experimental_option("prefs", {
         "download.default_directory": str(download_dir),
@@ -45,6 +65,20 @@ def make_driver(download_dir: pathlib.Path, headless: bool = True) -> webdriver.
     except Exception:
         pass
     return drv
+
+def normalize_course_code(course_code: str) -> str:
+    """
+    Normalize course code to handle different formats:
+    - Remove hyphens and spaces
+    - Convert to uppercase
+    - Examples: 'ucs503' -> 'UCS503', 'ucs-503' -> 'UCS503', 'UCS-530' -> 'UCS530'
+    """
+    if not course_code:
+        return ""
+    
+    # Remove hyphens, spaces, and convert to uppercase
+    normalized = course_code.replace('-', '').replace(' ', '').upper()
+    return normalized
 
 def wait_for_results(driver, query_text: str, timeout=12):
     """
@@ -303,11 +337,13 @@ def main():
             examFilter = sys.argv[4]
     if option:
         by_code = option != "2"
-        query = value.strip().upper() if by_code else value.strip()
+        query = normalize_course_code(value.strip()) if by_code else value.strip()
     else:
         by_code = input("Enter 1 or 2: ").strip() != "2"
         if by_code:
-            query = input("Enter Course Code: ").strip().upper()
+            raw_input = input("Enter Course Code: ").strip()
+            query = normalize_course_code(raw_input)
+            print(f"Normalized course code: {query}")
         else:
             query = input("Enter Course Name (or part): ").strip()
     if by_code:
