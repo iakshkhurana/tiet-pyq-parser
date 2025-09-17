@@ -131,7 +131,7 @@ tiet-pyq-parser/
 
 Watch the demo video to see the application in action:
 
-[![Demo Video](https://img.shields.io/badge/📹%20Watch%20Demo-Demo%20Video-red?style=for-the-badge)](https://github.com/iakshkhurana/tiet-pyq-parser/blob/main/others/demo.mp4)
+[![Demo Video](https://img.shields.io/badge/📹%20Watch%20Demo-Demo%20Video-red?style=for-the-badge)](https://youtu.be/X66TuT-R0m8)
 
 ## 🔧 Technical Details
 
