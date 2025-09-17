@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 3, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"","debugId":null}},
+    {"offset": {"line": 15, "column": 0}, "map": {"version":3,"sources":["file:///K:/Side-Projects/frontend/app/page.tsx"],"sourcesContent":["import Image from \"next/image\"\n\nexport default function App(){\n  return <div className=\"\">\n    <Image alt=\"logo\" src=\"/thapar.jpeg\" width={32} height={32} className=\"w-15 ml-175 mt-25\" />\n  </div>\n}"],"names":[],"mappings":";;;;;AAAA;;;AAEe,SAAS;IACtB,qBAAO,8OAAC;QAAI,WAAU;kBACpB,cAAA,8OAAC,wIAAK;YAAC,KAAI;YAAO,KAAI;YAAe,OAAO;YAAI,QAAQ;YAAI,WAAU;;;;;;;;;;;AAE1E","debugId":null}}]
+}
